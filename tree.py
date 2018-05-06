@@ -16,7 +16,7 @@ def drawTree(point, angle, depth):
     setpos(point)
     if depth:
         pencolor(colors[depth])
-        pensize(depth + 10 * 2**(depth - 9))
+        pensize(depth + 10 * 2**(depth - 9) + 4**(2 - depth))
         setheading(angle)
         pendown()
         forward(10 * depth)

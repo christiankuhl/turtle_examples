@@ -35,7 +35,7 @@ def coords_from_int(n):
             -radius * cos(n/modulus*2*pi)]
 
 # Get input
-operand = int(numinput("Einmaleins.", "Reihe:", 3, minval=2, maxval=10))
+operand = int(numinput("Einmaleins.", "Reihe:", 2, minval=2, maxval=20))
 
 # Do the actual math
 turtle.color("blue")
@@ -49,5 +49,4 @@ for a in range(modulus):
         result = (result * operand) % modulus
         turtle.pendown()
         turtle.setpos(*coords_from_int(result))
-
 done()

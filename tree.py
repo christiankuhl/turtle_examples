@@ -29,4 +29,4 @@ def drawTree(point, angle, depth):
 
 # Actual work
 drawTree((0, -200), 90, 9)
-done()
+exitonclick()

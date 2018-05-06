@@ -36,5 +36,4 @@ end_fill()
 
 # Make the last parts appear
 update()
-
-done()
+exitonclick()

@@ -1,4 +1,4 @@
-import turtle
+from turtle import *
 
 def turn(i):
     left = (((i & -i) << 1) & i) != 0
@@ -8,13 +8,13 @@ def curve(iteration):
     return ''.join([turn(i + 1) for i in range(2 ** iteration - 1)])
 
 if __name__ == '__main__':
-    turtle.showturtle()
-    turtle.hideturtle()
-    turtle.speed(0)
+    showturtle()
+    hideturtle()
+    speed(0)
     i = 1
     while True:
         if turn(i) == 'L':
-            turtle.circle(-4, 90, 36)
+            circle(-4, 90, 36)
         else:
-            turtle.circle(4, 90, 36)
+            circle(4, 90, 36)
         i += 1

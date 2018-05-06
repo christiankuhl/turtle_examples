@@ -35,7 +35,7 @@ def coords_from_int(n):
             -radius * cos(n/modulus*2*pi)]
 
 # Get input
-operand = int(numinput("Einmaleins.", "Reihe:", 2, minval=2, maxval=20))
+operand = int(numinput("Einmaleins.", "Reihe:", 2, minval=2, maxval=100))
 
 # Do the actual math
 turtle.color("blue")

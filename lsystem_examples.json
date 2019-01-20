@@ -168,4 +168,4 @@
                           "initial_heading": 50,
                           "initial_position": [-300, -300]},
                           "turtle_options": {"pre": [{"tracer": [10000]},
-                                                     {"pencolor": [0, 127, 50]}]}}}
+                                                     {"pencolor": [0, 160, 40]}]}}}

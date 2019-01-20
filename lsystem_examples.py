@@ -5,6 +5,7 @@ from functools import partial
 import json
 import render_hooks
 import turtle
+import time
 
 def draw_example(name, example_file="lsystem_examples.json"):
     with open(example_file, "r") as file:
@@ -16,7 +17,7 @@ def draw_example(name, example_file="lsystem_examples.json"):
     try:
         example_system = example["lsystem"]
     except KeyError:
-        raise AttributeError(f"No L-system definition for example '{name}' found!'")
+        raise AttributeError(f"No consistent L-system definition for example '{name}' found!'")
     draw_options = example.get("draw_options", {})
     hook_candidates = draw_options.get("render_hooks", [])
     if hook_candidates:
@@ -36,12 +37,7 @@ def draw_example(name, example_file="lsystem_examples.json"):
         for function, args in option.items():
             getattr(turtle, function)(*args)
 
-if __name__ == "__main__":
-    try:
-        example_name = sys.argv[1]
-    except IndexError:
-        example_name = input("Example name: ")
-    turtle.setup(width=960, height=810)
+def reset_turtle():
     turtle.speed("fastest")
     turtle.tracer(2)
     turtle.hideturtle()
@@ -49,5 +45,22 @@ if __name__ == "__main__":
     turtle.bgcolor((0, 0, 0))
     turtle.pencolor((255, 255, 255))
     turtle.pensize(1)
-    draw_example(example_name)
+    turtle.clear()
+
+if __name__ == "__main__":
+    try:
+        example_name = sys.argv[1].lower()
+    except IndexError:
+        example_name = input("Example name: ").lower()
+    turtle.setup(width=960, height=810)
+    if example_name == "all":
+        with open("lsystem_examples.json", "r") as file:
+            examples = json.load(file, object_hook=OrderedDict)
+        for example in examples.keys():
+            reset_turtle()
+            draw_example(example)
+            time.sleep(1)
+    else:
+        reset_turtle()
+        draw_example(example_name)
     turtle.exitonclick()

@@ -1,7 +1,7 @@
 from turtle import *
 import re
 from functools import partial
-from random import uniform
+from numpy.random import choice, random
 
 class L_System:
     """
@@ -30,6 +30,12 @@ class L_System:
        (	         Decrement turning angle by turning angle increment
        )	         Increment turning angle by turning angle increment
 
+    These replacement rules are provided to the constructor via production_rules,
+    which is expected to be of type dict(str: str | dict(float: str))).
+    So in the simplest case, production_rules is a mapping from strings to strings.
+    If, on the other hand, the values of production_rules are dict(float: str),
+    the keys of these values are interpreted as weights for a random choice of
+    a production rule at any stage.
     Additional alphabet characters can be provided by providing additional_actions,
     or by monkeypatching self.exec_map, which handles the mapping of alphabet
     characters to instance methods. Symbols which are neither contained in above
@@ -42,7 +48,7 @@ class L_System:
     """
     def __init__(self, start, production_rules, angle, scale_factor=1,
                  width_increment=0, angle_increment=0, length_increment=0,
-                 additional_actions={}, condense=True, **kwargs):
+                 additional_actions={}, condense=True, debug=False, **kwargs):
         self.start = start
         self.productions = production_rules
         self.angle = angle
@@ -52,6 +58,7 @@ class L_System:
         self.angle_increment = angle_increment
         self.kwargs = kwargs
         self.stack = []
+        self.debug = debug
         self.reductions = {sym: repl for (sym, repl) in production_rules.items()
                                                 if len(sym) > len(repl)}
         self.exec_map = {"X": self.NO_OP,
@@ -89,15 +96,31 @@ class L_System:
         for symbol in self.start:
             if self.exec_map.get(symbol, self.NO_OP) == self.NO_OP:
                 self.reductions[symbol] = ""
+        self.simple = True
         for production in production_rules.values():
-            for symbol in production:
-                if self.exec_map.get(symbol, self.NO_OP) == self.NO_OP:
-                    self.reductions[symbol] = ""
+            if type(production) == str:
+                for symbol in production:
+                    if self.exec_map.get(symbol, self.NO_OP) == self.NO_OP:
+                        self.reductions[symbol] = ""
+            elif issubclass(type(production), dict):
+                self.simple = False
+                for rule in production.values():
+                    for symbol in production:
+                        if self.exec_map.get(symbol, self.NO_OP) == self.NO_OP:
+                            self.reductions[symbol] = ""
+            else:
+                raise ValueError("Cannot interpret production rules.")
     def execute_productions(self, iterations=5, productions=None, start_string=""):
         if not productions:
             productions = self.productions
         if not start_string:
             start_string = self.start
+        if self.simple or not iterations:
+            result = self.execute_simple_productions(iterations, productions, start_string)
+        else:
+            result = self.execute_prob_productions(iterations, productions, start_string)
+        return result
+    def execute_simple_productions(self, iterations, productions, start_string):
         production_regex = re.compile("|".join(map(re.escape, productions.keys())))
         result = start_string
         if iterations:
@@ -110,6 +133,24 @@ class L_System:
                 if old_result == result:
                     break
         return result
+    def execute_prob_productions(self, iterations, productions, start_string):
+        result = start_string
+        for _ in range(iterations):
+            prob_productions = self.probabilistic_productions(productions)
+            production_regex = re.compile("|".join(map(re.escape, prob_productions.keys())))
+            result = production_regex.sub(lambda match: prob_productions[match.group(0)], result)
+        return result
+    def probabilistic_productions(self, productions):
+        result = {}
+        for key, value in productions.items():
+            if type(value) == str:
+                result[key] = value
+            else:
+                total_weight = sum(float(w) for w in value.keys())
+                chosen_value = choice(list(value.values()), p=[float(weight)/total_weight
+                                                         for weight in value.keys()])
+                result[key] = chosen_value
+        return result
     def draw(self, iterations, base_length=5, initial_heading=0,
              initial_position=(0, 0), render_hooks=[]):
         self.length = base_length
@@ -120,6 +161,8 @@ class L_System:
         production_string = self.execute_productions(iterations)
         if self.condense_result:
             production_string = self.condense(production_string)
+        if self.debug:
+            print(production_string)
         for symbol in production_string:
             for hook in render_hooks:
                 hook(self)
@@ -178,4 +221,4 @@ class L_System:
             radius = self.radius
         circle(radius, extent, steps)
     def RANDOM_ANGLE(self, left, right):
-        setheading(heading() + uniform(left, right))
+        setheading(heading() + (right - left) * random() + left)

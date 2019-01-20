@@ -25,8 +25,8 @@ class L_System:
        %	         Decrement the line length by line length increment
        >	         Multiply the line length by the line length scale factor
        <	         Divide the line length by the line length scale factor
-       *	         Multiply the line width by the line length scale factor
-       /	         Divide the line width by the line length scale factor
+       *	         Multiply the line width by the line width scale factor
+       /	         Divide the line width by the line width scale factor
        (	         Decrement turning angle by turning angle increment
        )	         Increment turning angle by turning angle increment
 

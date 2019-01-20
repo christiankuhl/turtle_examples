@@ -49,4 +49,4 @@ for a in range(modulus):
         result = (result * operand) % modulus
         turtle.pendown()
         turtle.setpos(*coords_from_int(result))
-done()
+exitonclick()

@@ -1,6 +1,7 @@
 from turtle import *
 import re
-
+from functools import partial
+from random import uniform
 
 class L_System:
     """
@@ -20,59 +21,130 @@ class L_System:
        ]	         Pop current drawing state from the stack
        #	         Increment the line width by line width increment
        !	         Decrement the line width by line width increment
+       &	         Increment the line length by line length increment
+       %	         Decrement the line length by line length increment
        >	         Multiply the line length by the line length scale factor
        <	         Divide the line length by the line length scale factor
+       *	         Multiply the line width by the line length scale factor
+       /	         Divide the line width by the line length scale factor
        (	         Decrement turning angle by turning angle increment
        )	         Increment turning angle by turning angle increment
 
-    Additional alphabet characters can be provided by monkeypatching self.exec_map,
-    which handles the mapping of alphabet characters to instance methods.
-    Symbols not contained in above list are interpreted as NOOP.
+    Additional alphabet characters can be provided by providing additional_actions,
+    or by monkeypatching self.exec_map, which handles the mapping of alphabet
+    characters to instance methods. Symbols which are neither contained in above
+    list nor in additional_actions are interpreted as NO_OP.
     Further, each concrete drawing method may depend on other parameters such
     as scale factors etc., which can be passed to the constructor as optional
     parameters.
-    Finally, for the draw method, there is a hook called after each rendering
+    Finally, for the draw method, there is a hook called before each rendering
     step which can be used for graphics customisation.
     """
     def __init__(self, start, production_rules, angle, scale_factor=1,
-                 width_increment=0, angle_increment=0, **kwargs):
+                 width_increment=0, angle_increment=0, length_increment=0,
+                 additional_actions={}, condense=True, **kwargs):
         self.start = start
         self.productions = production_rules
         self.angle = angle
         self.scale_factor = scale_factor
         self.width_increment = width_increment
+        self.length_increment = length_increment
         self.angle_increment = angle_increment
         self.kwargs = kwargs
         self.stack = []
-        self.exec_map = {"X": self.NOOP,
+        self.reductions = {sym: repl for (sym, repl) in production_rules.items()
+                                                if len(sym) > len(repl)}
+        self.exec_map = {"X": self.NO_OP,
                          "F": self.FORWARD,
                          "f": self.FORWARD_NODRAW,
                          "|": self.REVERSE,
                          "#": self.INC_WIDTH,
                          "!": self.DEC_WIDTH,
-                         ">": self.MUL_WIDTH,
-                         "<": self.DIV_WIDTH,
+                         ">": self.MUL_LENGTH,
+                         "<": self.DIV_LENGTH,
+                         "*": self.MUL_WIDTH,
+                         "/": self.DIV_WIDTH,
+                         "&": self.INC_LENGTH,
+                         "%": self.DEC_LENGTH,
                          "[": self.LBRACKET,
                          "]": self.RBRACKET,
                          "+": self.PLUS,
                          "-": self.MINUS,
                          "(": self.INC_ANGLE,
                          ")": self.DEC_ANGLE}
+        self.condense_result = condense
+        for symbol, (action, args) in additional_actions.items():
+            if len(symbol) > 1:
+                print(f"W: Symbol of length {len(symbol)} encountered.\
+                      Symbol skipped.")
+            try:
+                action = partial(getattr(self, action), *args)
+            except AttributeError:
+                print(f"W: Action {action} is not defined - mapped to NO_OP.")
+                action = self.NO_OP
+            self.exec_map[symbol] = action
+        for symbol, operation in self.exec_map.items():
+            if operation == self.NO_OP:
+                self.reductions[symbol] = ""
+        for symbol in self.start:
+            if self.exec_map.get(symbol, self.NO_OP) == self.NO_OP:
+                self.reductions[symbol] = ""
+        for production in production_rules.values():
+            for symbol in production:
+                if self.exec_map.get(symbol, self.NO_OP) == self.NO_OP:
+                    self.reductions[symbol] = ""
+    def execute_productions(self, iterations=5, productions=None, start_string=""):
+        if not productions:
+            productions = self.productions
+        if not start_string:
+            start_string = self.start
+        production_regex = re.compile("|".join(map(re.escape, productions.keys())))
+        result = start_string
+        if iterations:
+            for _ in range(iterations):
+                result = production_regex.sub(lambda match: productions[match.group(0)], result)
+        else:
+            while True:
+                old_result = result
+                result = production_regex.sub(lambda match: productions[match.group(0)], result)
+                if old_result == result:
+                    break
+        return result
+    def draw(self, iterations, base_length=5, initial_heading=0,
+             initial_position=(0, 0), render_hooks=[]):
+        self.length = base_length
+        penup()
+        setheading(initial_heading)
+        setpos(*initial_position)
+        pendown()
+        production_string = self.execute_productions(iterations)
+        if self.condense_result:
+            production_string = self.condense(production_string)
+        for symbol in production_string:
+            for hook in render_hooks:
+                hook(self)
+            self.exec_map.get(symbol, self.NO_OP)()
+    def condense(self, production_string):
+        result = self.execute_productions(None, self.reductions, production_string)
+        return result
+    def level(self):
+        return len(self.stack)
+    def NO_OP(self):
+        pass
     def FORWARD(self):
         forward(self.length)
     def FORWARD_NODRAW(self):
         penup()
         forward(self.length)
         pendown()
-    def NOOP(self):
-        pass
     def LBRACKET(self):
-        self.stack.append((position(), heading(), pensize()))
+        self.stack.append((position(), heading(), self.length, pensize()))
     def RBRACKET(self):
-        pos, head, pen = self.stack.pop()
+        pos, head, length, pen = self.stack.pop()
         penup()
         setpos(pos)
         setheading(head)
+        self.length = length
         pensize(pen)
         pendown()
     def PLUS(self):
@@ -89,24 +161,21 @@ class L_System:
         pensize(pensize() * self.scale_factor)
     def DIV_WIDTH(self):
         pensize(pensize() / self.scale_factor)
+    def MUL_LENGTH(self):
+        self.length *= self.scale_factor
+    def DIV_LENGTH(self):
+        self.length /= self.scale_factor
+    def INC_LENGTH(self):
+        self.length += self.length_increment
+    def DEC_LENGTH(self):
+        self.length -= self.length_increment
     def INC_ANGLE(self):
         self.angle += self.angle_increment
     def DEC_ANGLE(self):
         self.angle -= self.angle_increment
-    def execute_productions(self, iterations=5):
-        production_regex = re.compile("|".join(map(re.escape, self.productions.keys())))
-        result = self.start
-        for _ in range(iterations):
-            result = production_regex.sub(lambda match: self.productions[match.group(0)], result)
-        return result
-    def draw(self, iterations, base_length=5, initial_heading=0,
-             initial_position=(0, 0), render_hook=lambda: None):
-        self.length = base_length
-        penup()
-        setheading(initial_heading)
-        setpos(*initial_position)
-        pendown()
-        production_string = self.execute_productions(iterations)
-        for symbol in production_string:
-            self.exec_map.get(symbol, self.NOOP)()
-            render_hook()
+    def CIRCLE(self, radius=None, extent=None, steps=None):
+        if not radius:
+            radius = self.radius
+        circle(radius, extent, steps)
+    def RANDOM_ANGLE(self, left, right):
+        setheading(heading() + uniform(left, right))
